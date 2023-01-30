@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: secure
+  labels:
+    istio-injection: enabled
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: victim
+  namespace: secure
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: victim
+  template:
+    metadata:
+      labels:
+        app: victim
+    spec:
+      containers:
+      - name: httpbin
+        image: kennethreitz/httpbin
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+
+---
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: victim
+  namespace: secure
+spec:
+  selector:
+    app: victim
+  ports:
+  - protocol: TCP
+    name: http
+    port: 80
+    targetPort: http
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: legitclient
+  namespace: secure
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: legitclient
+  namespace: secure
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: legitclient
+  template:
+    metadata:
+      labels:
+        app: legitclient
+    spec:
+      serviceAccount: legitclient
+      containers:
+      - name: ubuntu
+        image: ubuntu:latest
+        command: ["tail", "-f", "/dev/null"]
+
+---
+
+
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allowlegit
+  namespace: secure
+spec:
+  action: ALLOW
+  selector:
+    matchLabels:
+      app: victim
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/secure/sa/legitclient"]
+
+---
+
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: "strict"
+  namespace: secure
+spec:
+  mtls:
+    mode: STRICT

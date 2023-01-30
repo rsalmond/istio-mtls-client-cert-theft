@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: attack
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: attack
+  namespace: attack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: attack
+  template:
+    metadata:
+      labels:
+        app: attack
+    spec:
+      containers:
+      - name: foo
+        image: gcr.io/cloud-builders/curl
+        command: ["tail", "-f", "/dev/null"]
+
