@@ -12,7 +12,14 @@ The setup contains two namespaces. In the secure namespace is a deployment and s
 
 ![x](foo.png)
 
-### Testing
+### Running The Test
+
+#### Requirements
+- a running cluster / valid kubeconfig
+- `istioctl install -y` (tested on 1.14 - 1.16)
+- openssl
+- jq
+- [grpcurl](https://github.com/fullstorydev/grpcurl)
 
 When the script executed the following steps will take place:
 1. a new private key and certificate signing request will be generated
