@@ -86,3 +86,4 @@ Note that upon successful authentication of a valid inbound mTLS connection, the
 https://istio.io/latest/docs/reference/config/security/authorization-policy/#Source
 https://github.com/istio/istio/blob/master/pkg/istio-agent/README.md
 https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_conn_man/headers#x-forwarded-client-cert
+https://gist.github.com/howardjohn/b9c031de3fb32eeff4076c6ef139e769
