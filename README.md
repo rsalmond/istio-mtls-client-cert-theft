@@ -79,7 +79,10 @@ When the script executed the following steps will take place:
 1. we will attempt to plaintext curl the victim service from within the attack pod in the attack namespace, since mTLS is required this connection will be rejected by the receiving sidecar proxy on the victim pod (reset by peer)
 1. we will attempt to curl the victim service from within the attack pod in the attack namespace, but this time using the private key and signed client certificate, which will be authenticated by the receiving sidecar proxy on the victim pod, and a connection established using the identity of the legitclient in the secure namespace.
 
+Note that upon successful authentication of a valid inbound mTLS connection, the istio-proxy will populate an HTTP response header called `X-Forwarded-Client-Cert` (or "XFCC") with both the receiving / server side identity (indicated with "By=spiffe...") and the sending / client side identity (indicated with "URI=spiffe..."). By examining this header you can verify that the connection was established using the stolen identity.
+
 ### References
 
 https://istio.io/latest/docs/reference/config/security/authorization-policy/#Source
 https://github.com/istio/istio/blob/master/pkg/istio-agent/README.md
+https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_conn_man/headers#x-forwarded-client-cert
