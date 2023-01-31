@@ -8,7 +8,7 @@ This repo demonstrates the situation.
 
 ### Test Setup
 
-The setup contains two namespaces. In the secure namespace is a deployment and service called "victim", and a deployment called "legitclient". An Istio `PeerAuthentication` resource requires all traffic in this namespace to be mTLS encrypted (cleartext traffic will be rejected) and an Istio `AuthorizationPolicy` requires all traffic destined for the "victim" workloads to be identified by the SPIFFE identity `spiffee://cluster.local/ns/secure/sa/legitclient`, which can be read as "this request is coming from the 'secure' namespace and the requesting pod is using the 'legitclient' Kubernetes service account". See [secure.yaml](secure.yaml) for specifics.
+The setup contains two namespaces. In the secure namespace is a deployment and service called "victim", and a deployment called "legitclient". An Istio `PeerAuthentication` resource requires all traffic bound for pods in this namespace to be mTLS encrypted (cleartext traffic will be rejected by the sidecar proxies on these pods) and an Istio `AuthorizationPolicy` requires all traffic destined for the "victim" workloads to be identified by the SPIFFE identity `spiffee://cluster.local/ns/secure/sa/legitclient`, which can be read as "this request is coming from the 'secure' namespace and the requesting pod is using the 'legitclient' Kubernetes service account". See [secure.yaml](secure.yaml) and references below for specifics.
 
 ![x](foo.png)
 
@@ -76,9 +76,10 @@ When the script executed the following steps will take place:
 1. the service account token from the sidecar container of the legitclient pod will be "stolen"
 1. the stolen service account token will be used to send the csr to istiod/citadel asking for a signed mTLS client certificate
 1. citadel will accept the stolen token and sign the csr, returning an mTLS client certificate with the identity data populated by the claims present in the stolen token
-1. we will attempt to plaintext curl the victim service from within the attack pod in the attack namespace, since mTLS is required this connection will be rejected (reset by peer)
-1. we will attempt to curl the victim service from within the attack pod in the attack namespace, but this time using the private key and signed client certificate, which will be authenticated using the identity of the legitclient in the secure namespace.
+1. we will attempt to plaintext curl the victim service from within the attack pod in the attack namespace, since mTLS is required this connection will be rejected by the receiving sidecar proxy on the victim pod (reset by peer)
+1. we will attempt to curl the victim service from within the attack pod in the attack namespace, but this time using the private key and signed client certificate, which will be authenticated by the receiving sidecar proxy on the victim pod, and a connection established using the identity of the legitclient in the secure namespace.
 
 ### References
 
+https://istio.io/latest/docs/reference/config/security/authorization-policy/#Source
 https://github.com/istio/istio/blob/master/pkg/istio-agent/README.md
